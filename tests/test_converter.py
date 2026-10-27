@@ -117,7 +117,7 @@ class ConverterGuardrailTests(unittest.TestCase):
             banner = "FL Studio 25.2.4.4960.4960\\x00".encode("utf-16le")
             banner_event = bytes([0xC0, len(banner)]) + banner
             playlist = bytes(range(80)) + bytes(range(80))
-            playlist_event = bytes([0xE9, len(playlist)]) + playlist
+            playlist_event = bytes([0xE9, 80]) + playlist[:80] + bytes([0xE9, 80]) + playlist[80:]
             events = (
                 bytes([0xAC, 1, 1, 0])
                 + banner_event
@@ -130,9 +130,9 @@ class ConverterGuardrailTests(unittest.TestCase):
             out_raw = output.read_bytes()
             _, out_events, _ = __import__("flpswap.flp_migration", fromlist=["read_events"]).read_events(out_raw)
             e9_payloads = [event.payload for event in out_events if event.event_id == 0xE9]
-            self.assertEqual(len(e9_payloads), 1)
-            self.assertEqual(len(e9_payloads[0]), 120)
-            self.assertEqual(e9_payloads[0], playlist[:60] + playlist[80:140])
+            self.assertEqual(len(e9_payloads), 2)
+            self.assertEqual([len(payload) for payload in e9_payloads], [60, 60])
+            self.assertEqual(e9_payloads[0] + e9_payloads[1], playlist[:60] + playlist[80:140])
             self.assertEqual(output_report["migration"]["playlist_records_resized"], 2)
             self.assertFalse(any(event.event_id == 0x9F for event in out_events))
 
