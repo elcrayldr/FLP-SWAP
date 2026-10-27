@@ -27,8 +27,12 @@ TARGET_VERSIONS = (
 
 # User-facing 2025 release labels map to internal FL Studio versions stored in FLP files.
 TARGET_INTERNAL_VERSIONS = {
-    "FL Studio 2025.1.0": "25.1.1",
-    "FL Studio 2025.2.5": "25.2.5",
+    # Display names are simplified; FLP files store the actual saved build when known.
+    "FL Studio 2025.1.0": "25.1.1.4879",
+    "FL Studio 2025.2.5": "25.2.5.5319",
+    "FL Studio 21.2.3": "21.2.3.4004",
+    "FL Studio 26.1.4": "26.1.4.5589",
+    "FL Studio 26.1.7": "26.1.7.5654",
 }
 
 
