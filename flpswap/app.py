@@ -25,6 +25,16 @@ TARGET_VERSIONS = (
     "FL Studio 26.1.4", "FL Studio 26.1.7",
 )
 
+# User-facing 2025 release labels map to internal FL Studio versions stored in FLP files.
+TARGET_INTERNAL_VERSIONS = {
+    "FL Studio 2025.1.0": "25.1.1",
+    "FL Studio 2025.2.5": "25.2.5",
+}
+
+
+def internal_version(label: str) -> str:
+    return TARGET_INTERNAL_VERSIONS.get(label, label.replace("FL Studio ", "").strip())
+
 
 class FLPSwapApp(tk.Tk):
     def __init__(self) -> None:
@@ -139,7 +149,7 @@ class FLPSwapApp(tk.Tk):
 
         self.file_label.configure(text=str(self.selected_file))
         try:
-            target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+            target_numeric = internal_version(self.target_version.get())
             assessment = assess_compatibility(metadata.saved_version, target_numeric)
             assessment_report = assessment.to_dict()
         except ValueError as exc:
@@ -149,6 +159,7 @@ class FLPSwapApp(tk.Tk):
         self.last_report = {
             "application_version": __version__,
             "selected_target_version": target_numeric,
+            "selected_target_label": self.target_version.get(),
             "inspection": {
                 "path": inspected.path,
                 "size_bytes": inspected.size_bytes,
@@ -190,11 +201,12 @@ class FLPSwapApp(tk.Tk):
         if self.selected_file is None:
             messagebox.showinfo("Selecciona un proyecto", "Primero selecciona el archivo FLP que quieres convertir.")
             return
-        target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+        target_label = self.target_version.get()
+        target_numeric = internal_version(target_label)
         selected_source = self.source_version.get()
         declared_source = (
             None if selected_source == "Auto-detectar desde el FLP"
-            else selected_source.replace("FL Studio ", "").strip()
+            else internal_version(selected_source)
         )
         suggested = f"{self.selected_file.stem}_FLPSWAP_{target_numeric}.flp"
         output_name = filedialog.asksaveasfilename(
@@ -250,6 +262,7 @@ class FLPSwapApp(tk.Tk):
             target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
             assessment = assess_compatibility(metadata.saved_version, target_numeric)
             self.last_report["selected_target_version"] = target_numeric
+            self.last_report["selected_target_label"] = self.target_version.get()
             self.last_report["compatibility_assessment"] = assessment.to_dict()
             source_display = metadata.saved_version or "No identificada"
             relation_text = {
