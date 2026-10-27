@@ -55,9 +55,9 @@ Build:
 build_windows.bat
 ```
 
-The output is `dist\FLPSwap\FLPSwap.exe`. Zip and distribute the **entire** `dist\FLPSwap` folder, not the EXE alone.
+The portable output is `dist\FLPSwap\FLPSwap.exe`. Zip and distribute the **entire** `dist\FLPSwap` folder, not the EXE alone. If Inno Setup 6 is installed, the local build script also creates an installer in `dist\installer`.
 
-GitHub Actions builds the portable folder and publishes it as a workflow artifact.
+GitHub Actions builds the portable folder and Windows installer. Open [Actions](https://github.com/elcrayldr/FLP-SWAP/actions), choose the latest successful run, and download `FLPSwap-Windows-Portable` or `FLPSwap-Windows-Installer` from Artifacts.
 
 ## Dependency notice
 
