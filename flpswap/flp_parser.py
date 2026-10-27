@@ -70,13 +70,16 @@ def parse_flp_metadata(path: str | Path) -> FlpMetadata:
         warnings = []
 
     events = raw[event_start:event_end]
+    has_fl25_banner = "FL Studio 25.".encode("utf-16le") in raw or "FL Studio 26.".encode("utf-16le") in raw
     offset = 0
     count = 0
     saved_version = None
     while offset < len(events):
         event_id = events[offset]
         offset += 1
-        if event_id <= 63:
+        if event_id == 0xAC and has_fl25_banner:
+            size = 3
+        elif event_id <= 63:
             size = 1
         elif event_id <= 127:
             size = 2
