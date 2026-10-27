@@ -13,6 +13,7 @@ import tempfile
 from typing import Any
 
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
+from flpswap.flp_diagnostics import compare_inventories, inventory_flp
 
 
 class ConversionError(RuntimeError):
@@ -58,6 +59,10 @@ def convert_flp(
     except (OSError, ValueError, FlpFormatError) as exc:
         raise ConversionError(f"El archivo de origen no supera la validación FLP: {exc}") from exc
     original_hash = _sha256(source)
+    try:
+        before_inventory = inventory_flp(source)
+    except (OSError, ValueError) as exc:
+        raise ConversionError(f"No se pudo inventariar la estructura interna del FLP: {exc}") from exc
     actual_source_version = before.saved_version
     if not actual_source_version:
         raise ConversionError(
@@ -88,6 +93,14 @@ def convert_flp(
 
         # Validate the serialized output before promoting it to the requested path.
         after = parse_flp_metadata(temp_path)
+        after_inventory = inventory_flp(temp_path)
+        event_comparison = compare_inventories(before_inventory, after_inventory)
+        if not event_comparison["event_id_counts_match_except_version_event"]:
+            raise ConversionError(
+                "La reescritura ha cambiado el número de eventos de uno o más tipos. "
+                "Para evitar pérdida silenciosa de datos, se ha cancelado la conversión. "
+                f"Cambios detectados: {event_comparison['event_id_count_changes']}"
+            )
         if not after.valid_container or after.saved_version != target_version:
             raise ConversionError(
                 "La comprobación posterior no coincide con la versión solicitada. "
@@ -129,11 +142,15 @@ def convert_flp(
         "source_preserved": _sha256(source) == original_hash,
         "input_event_count": before.event_count,
         "output_event_count": after.event_count,
+        "event_inventory_before": before_inventory.to_dict(),
+        "event_inventory_after": after_inventory.to_dict(),
+        "event_inventory_comparison": event_comparison,
         "input_size_bytes": source.stat().st_size,
         "output_size_bytes": output.stat().st_size,
         "compatibility_verified": False,
         "warnings": [
             "El proyecto se ha reserializado mediante un modelo semántico; esto no garantiza compatibilidad funcional con la versión destino.",
+            "Se compararon los recuentos de IDs de eventos; esta comprobación detecta ciertas pérdidas estructurales, pero no valida los valores internos ni el sonido.",
             "No se ha comprobado el estado de todos los plugins ni sus parámetros frente a la versión de destino.",
             "Abre el resultado en la versión de destino y comprueba patrones, automatizaciones, mezclador, instrumentos y efectos antes de usarlo.",
             "PyFLP es una biblioteca de terceros no oficial y su cobertura de formatos puede ser incompleta.",
