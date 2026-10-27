@@ -1,4 +1,4 @@
-"""Tkinter interface for FLP SWAP's current inspection foundation."""
+"""Tkinter interface for FLP SWAP's read-only inspection foundation."""
 from pathlib import Path
 import json
 import tkinter as tk
@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from flpswap import __version__
 from flpswap.flp_inspector import inspect_flp
+from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.version_detector import detect_installations
 
 
@@ -38,7 +39,7 @@ class FLPSwapApp(tk.Tk):
         ttk.Label(outer, text="FLP SWAP", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             outer,
-            text="Inspección segura de proyectos · La conversión se habilitará por reglas verificadas",
+            text="Inspección de proyectos FLP · conversión todavía no habilitada",
         ).pack(anchor="w", pady=(4, 16))
 
         actions = ttk.Frame(outer)
@@ -57,10 +58,9 @@ class FLPSwapApp(tk.Tk):
         )
         self.output.pack(fill="both", expand=True)
         self.output.insert("1.0", (
-            "Estado: inspección conservadora\n\n"
-            "Esta versión no modifica ni convierte proyectos. Selecciona un FLP para obtener "
-            "tamaño, SHA-256 y una inspección preliminar. No se inferirá una versión exacta "
-            "a partir de datos no verificados.\n"
+            "Estado: inspección de solo lectura\n\n"
+            "Selecciona un FLP para consultar su estructura y la versión guardada si puede "
+            "identificarse en el archivo. No se altera ni se convierte el proyecto original.\n"
         ))
         self.output.configure(state="disabled")
         self.last_report: dict = {"application_version": __version__, "status": "idle"}
@@ -80,23 +80,41 @@ class FLPSwapApp(tk.Tk):
             return
         self.selected_file = Path(selected)
         try:
-            result = inspect_flp(self.selected_file)
-        except (OSError, ValueError) as exc:
+            inspected = inspect_flp(self.selected_file)
+            metadata = parse_flp_metadata(self.selected_file)
+            metadata_report = {
+                "valid_container": metadata.valid_container,
+                "header_length": metadata.header_length,
+                "format_id": metadata.format_id,
+                "channel_count": metadata.channel_count,
+                "ppq": metadata.ppq,
+                "event_bytes": metadata.event_bytes,
+                "event_count": metadata.event_count,
+                "saved_version": metadata.saved_version,
+                "warnings": list(metadata.warnings),
+            }
+        except (OSError, ValueError, FlpFormatError) as exc:
             messagebox.showerror("No se pudo inspeccionar", str(exc))
             return
+
         self.file_label.configure(text=str(self.selected_file))
         self.last_report = {
             "application_version": __version__,
             "inspection": {
-                "path": result.path,
-                "size_bytes": result.size_bytes,
-                "sha256": result.sha256,
-                "signature_hex": result.signature_hex,
-                "signature_ascii": result.signature_ascii,
-                "status": result.status,
-                "notes": list(result.notes),
+                "path": inspected.path,
+                "size_bytes": inspected.size_bytes,
+                "sha256": inspected.sha256,
+                "signature_hex": inspected.signature_hex,
+                "signature_ascii": inspected.signature_ascii,
+                "status": inspected.status,
+                "notes": list(inspected.notes),
             },
-            "conversion": {"performed": False, "status": "not_implemented"},
+            "flp_metadata": metadata_report,
+            "conversion": {
+                "performed": False,
+                "status": "not_implemented",
+                "message": "La detección de versión no implica compatibilidad ni conversión.",
+            },
         }
         self._write(json.dumps(self.last_report, indent=2, ensure_ascii=False))
 
