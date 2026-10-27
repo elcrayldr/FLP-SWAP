@@ -16,7 +16,7 @@ def make_flp(events: bytes) -> bytes:
 class FlpDiagnosticsTests(unittest.TestCase):
     def test_inventory_counts_fixed_and_variable_events(self):
         # Event ID 1 has a one-byte payload; ID 200 has varint length 3.
-        events = bytes([1, 0x2A, 200, 3]) + b"abc" + bytes([199, 5]) + b"20.8"
+        events = bytes([1, 0x2A, 200, 3]) + b"abc" + bytes([199, 4]) + b"20.8"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.flp"
             path.write_bytes(make_flp(events))
