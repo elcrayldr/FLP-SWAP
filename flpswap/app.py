@@ -202,8 +202,8 @@ class FLPSwapApp(tk.Tk):
             f"Tipos de evento distintos: {len(event_inventory.event_id_counts)}\n"
             f"IDs de evento que requieren revisar reglas: {', '.join(map(str, event_inventory.event_ids_needing_mapping_review)) or 'Ninguno detectado'}\n"
             f"Contenedor FLP válido: {'Sí' if metadata.valid_container else 'No'}\n\n"
-            "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
-            "Esta versión de prueba no modifica el proyecto.\n\n"
+            "ESTADO: ANÁLISIS COMPLETADO; EL ARCHIVO NO SE HA MODIFICADO.\n"
+            "Pulsa «Convertir copia» para generar una copia.\n\n"
             "AVISOS:\n- " + "\n- ".join(assessment_report["warnings"])
         )
 
@@ -286,8 +286,8 @@ class FLPSwapApp(tk.Tk):
                 f"VERSIÓN DETECTADA EN EL FLP: {source_display}\n"
                 f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\n\n"
                 f"RESULTADO: {relation_text}\n\n"
-                "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
-                "Esta versión de prueba no modifica el proyecto."
+                "ESTADO: ANÁLISIS COMPLETADO; EL ARCHIVO NO SE HA MODIFICADO.\n"
+                "Pulsa «Convertir copia» para generar una copia."
             )
         except (OSError, ValueError, FlpFormatError) as exc:
             messagebox.showerror("No se pudo actualizar el análisis", str(exc))
