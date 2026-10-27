@@ -136,6 +136,24 @@ class ConverterGuardrailTests(unittest.TestCase):
             self.assertEqual(output_report["migration"]["playlist_records_resized"], 2)
             self.assertFalse(any(event.event_id == 0x9F for event in out_events))
 
+    def test_fl25_1_playlist_layout_is_detected_without_fl25_2_banner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "fl25_1.flp"
+            output = Path(directory) / "fl24.flp"
+            playlist = bytes(range(80))
+            playlist_event = bytes([0xE9, 80]) + playlist
+            events = text_event(199, "25.1.6.4997") + bytes([159]) + struct.pack("<I", 4997) + playlist_event
+            source.write_bytes(make_flp(events))
+
+            report = convert_flp(source, output, "24.1.0")
+            from flpswap.flp_migration import read_events
+            _, events_out, _ = read_events(output.read_bytes())
+            clips = [event.payload for event in events_out if event.event_id == 0xE9]
+            self.assertEqual(len(clips), 1)
+            self.assertEqual(len(clips[0]), 60)
+            self.assertEqual(clips[0], playlist[:60])
+            self.assertEqual(report["migration"]["playlist_records_resized"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
