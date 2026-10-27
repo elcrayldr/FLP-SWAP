@@ -31,4 +31,5 @@ if errorlevel 1 (
 echo.
 echo Build complete: %CD%\dist\FLPSwap\FLPSwap.exe
 echo This is a portable onedir build. Zip the entire dist\FLPSwap folder to distribute it.
+if exist "%ProgramFiles(x86)%\\Inno Setup 6\\ISCC.exe" ("%ProgramFiles(x86)%\\Inno Setup 6\\ISCC.exe" installer\\FLPSwap.iss)
 exit /b 0
