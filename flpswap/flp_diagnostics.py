@@ -102,7 +102,7 @@ def inventory_flp(path: str | Path) -> EventInventory:
         counts[event_id] += 1
         payload_sizes[event_id] += len(payload)
         if event_id == 199:
-            candidate = payload.rstrip(b"\\x00").decode("ascii", errors="ignore").strip()
+            candidate = payload.rstrip(b"\x00").decode("ascii", errors="ignore").strip()
             if candidate and any(ch.isdigit() for ch in candidate):
                 versions.append(candidate)
         offset = event_end
