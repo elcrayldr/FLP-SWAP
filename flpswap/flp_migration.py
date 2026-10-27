@@ -179,19 +179,18 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
             continue
 
         if event_id == 0xE9 and source_playlist_size > target_playlist_size:
-            old_record_size = source_playlist_size
-            if len(payload) % old_record_size != 0:
-                raise MigrationError(
-                    f"El evento de playlist 0xE9 contiene {len(payload)} bytes; no es múltiplo de {old_record_size}, "
-                    "por lo que no se puede migrar con seguridad."
-                )
-            transformed = bytearray()
-            for pos in range(0, len(payload), old_record_size):
-                record = payload[pos:pos + old_record_size]
-                transformed.extend(record[:target_playlist_size])
-                playlist_records += 1
-                resized_playlist_records += 1
-            payload = bytes(transformed)
+            # Do not truncate clip records based on a guessed layout. Earlier
+            # versions may store fields at different offsets; retaining only
+            # the prefix can corrupt clip positions, lengths, and/or the
+            # Playlist. Fail closed until a field-aware migration is proven
+            # against real FL Studio fixtures saved by both versions.
+            raise MigrationError(
+                "Conversión detenida para proteger el proyecto: la playlist contiene registros "
+                f"de {source_playlist_size} bytes y el destino espera {target_playlist_size}. "
+                "La conversión anterior recortaba los registros y podía corromper clips o dejar "
+                "el proyecto inutilizable. No se ha generado ningún archivo convertido. "
+                "Hace falta una regla de migración validada con proyectos reales de ambas versiones."
+            )
 
         output.extend(_encode_event(event_id, payload))
         output_event_ids.append(event_id)
