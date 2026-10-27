@@ -110,14 +110,14 @@ class ConverterGuardrailTests(unittest.TestCase):
             self.assertIn(struct.pack("<I", 4997), result)
             self.assertFalse(report["compatibility_verified"])
 
-    def test_downgrades_fl25_playlist_records_to_fl24_record_size(self):
+    def test_refuses_lossy_playlist_downgrade_instead_of_truncating_clip_records(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "fl25.flp"
             output = Path(directory) / "fl24.flp"
             banner = "FL Studio 25.2.4.4960.4960\\x00".encode("utf-16le")
             banner_event = bytes([0xC0, len(banner)]) + banner
-            playlist = bytes(range(80)) + bytes(range(80))
-            playlist_event = bytes([0xE9, 80]) + playlist[:80] + bytes([0xE9, 80]) + playlist[80:]
+            playlist = bytes(range(80))
+            playlist_event = bytes([0xE9, len(playlist)]) + playlist
             events = (
                 bytes([0xAC, 1, 1, 0])
                 + banner_event
@@ -126,33 +126,22 @@ class ConverterGuardrailTests(unittest.TestCase):
                 + playlist_event
             )
             source.write_bytes(make_flp(events))
-            output_report = convert_flp(source, output, "24.1.0")
-            out_raw = output.read_bytes()
-            _, out_events, _ = __import__("flpswap.flp_migration", fromlist=["read_events"]).read_events(out_raw)
-            e9_payloads = [event.payload for event in out_events if event.event_id == 0xE9]
-            self.assertEqual(len(e9_payloads), 2)
-            self.assertEqual([len(payload) for payload in e9_payloads], [60, 60])
-            self.assertEqual(e9_payloads[0] + e9_payloads[1], playlist[:60] + playlist[80:140])
-            self.assertEqual(output_report["migration"]["playlist_records_resized"], 2)
-            self.assertFalse(any(event.event_id == 0x9F for event in out_events))
+            with self.assertRaisesRegex(ConversionError, "proteger el proyecto"):
+                convert_flp(source, output, "24.1.0")
+            self.assertFalse(output.exists())
 
-    def test_fl25_1_playlist_layout_is_detected_without_fl25_2_banner(self):
+    def test_refuses_fl25_1_playlist_downgrade_without_field_aware_migration(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "fl25_1.flp"
             output = Path(directory) / "fl24.flp"
             playlist = bytes(range(80))
-            playlist_event = bytes([0xE9, 80]) + playlist
+            playlist_event = bytes([0xE9, len(playlist)]) + playlist
             events = text_event(199, "25.1.6.4997") + bytes([159]) + struct.pack("<I", 4997) + playlist_event
             source.write_bytes(make_flp(events))
 
-            report = convert_flp(source, output, "24.1.0")
-            from flpswap.flp_migration import read_events
-            _, events_out, _ = read_events(output.read_bytes())
-            clips = [event.payload for event in events_out if event.event_id == 0xE9]
-            self.assertEqual(len(clips), 1)
-            self.assertEqual(len(clips[0]), 60)
-            self.assertEqual(clips[0], playlist[:60])
-            self.assertEqual(report["migration"]["playlist_records_resized"], 1)
+            with self.assertRaisesRegex(ConversionError, "proteger el proyecto"):
+                convert_flp(source, output, "24.1.0")
+            self.assertFalse(output.exists())
 
     def test_converts_legacy_fruityloops_file_without_version_event_when_source_is_declared(self):
         with tempfile.TemporaryDirectory() as directory:
