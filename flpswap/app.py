@@ -157,16 +157,16 @@ class FLPSwapApp(tk.Tk):
             "unknown": "No se ha podido determinar con seguridad la versión de origen.",
         }.get(assessment_report["relation"], assessment_report["relation"])
         self._write(
-            f"PROYECTO: {self.selected_file.name}\\n"
-            f"VERSIÓN DETECTADA EN EL FLP: {source_display}\\n"
-            f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\\n\\n"
-            f"RESULTADO: {relation_text}\\n\\n"
-            f"Tamaño: {inspected.size_bytes:,} bytes\\n"
-            f"Eventos FLP analizados: {metadata.event_count}\\n"
-            f"Contenedor FLP válido: {'Sí' if metadata.valid_container else 'No'}\\n\\n"
-            "ESTADO DE CONVERSIÓN: NO REALIZADA.\\n"
-            "Esta versión de prueba no modifica el proyecto.\\n\\n"
-            "AVISOS:\\n- " + "\\n- ".join(assessment_report["warnings"])
+            f"PROYECTO: {self.selected_file.name}\n"
+            f"VERSIÓN DETECTADA EN EL FLP: {source_display}\n"
+            f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\n\n"
+            f"RESULTADO: {relation_text}\n\n"
+            f"Tamaño: {inspected.size_bytes:,} bytes\n"
+            f"Eventos FLP analizados: {metadata.event_count}\n"
+            f"Contenedor FLP válido: {'Sí' if metadata.valid_container else 'No'}\n\n"
+            "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
+            "Esta versión de prueba no modifica el proyecto.\n\n"
+            "AVISOS:\n- " + "\n- ".join(assessment_report["warnings"])
         )
 
     def on_target_changed(self, _event=None) -> None:
@@ -186,11 +186,11 @@ class FLPSwapApp(tk.Tk):
                 "unknown": "No se ha podido determinar con seguridad la versión de origen.",
             }.get(assessment.relation, assessment.relation)
             self._write(
-                f"PROYECTO: {self.selected_file.name}\\n"
-                f"VERSIÓN DETECTADA EN EL FLP: {source_display}\\n"
-                f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\\n\\n"
-                f"RESULTADO: {relation_text}\\n\\n"
-                "ESTADO DE CONVERSIÓN: NO REALIZADA.\\n"
+                f"PROYECTO: {self.selected_file.name}\n"
+                f"VERSIÓN DETECTADA EN EL FLP: {source_display}\n"
+                f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\n\n"
+                f"RESULTADO: {relation_text}\n\n"
+                "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
                 "Esta versión de prueba no modifica el proyecto."
             )
         except (OSError, ValueError, FlpFormatError) as exc:
