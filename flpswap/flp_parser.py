@@ -89,7 +89,7 @@ def parse_flp_metadata(path: str | Path) -> FlpMetadata:
             raise FlpFormatError(f"Event {count + 1} (ID {event_id}) extends past the FLdt chunk.")
         payload = events[offset:end]
         if event_id == 199 and saved_version is None:
-            candidate = payload.rstrip(b"\\x00").decode("ascii", errors="ignore").strip()
+            candidate = payload.rstrip(b"\x00").decode("ascii", errors="ignore").strip()
             # Do not report arbitrary binary data as a version string.
             if candidate and any(ch.isdigit() for ch in candidate) and all(
                 ch.isdigit() or ch in ".-+abrc " for ch in candidate.lower()
