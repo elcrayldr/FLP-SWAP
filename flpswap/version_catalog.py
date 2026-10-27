@@ -38,10 +38,8 @@ RELEASES = (
     Release("26.1.5", "macos", "5384", "2026-08-24", source="https://forum.image-line.com/viewtopic.php?t=342068"),
     Release("26.1.6", "windows", "5639", "2026-09-07", source="https://forum.image-line.com/viewtopic.php?t=342331"),
     Release("26.1.6", "macos", "5406", "2026-09-07", source="https://forum.image-line.com/viewtopic.php?t=342331"),
-    Release("26.1.7", "windows", "5653", "2026-10-01", source="https://forum.image-line.com/viewtopic.php?t=342646"),
-    Release("26.1.7", "macos", "5419", "2026-10-01", source="https://forum.image-line.com/viewtopic.php?t=342646"),
-    Release("26.1.7b", "windows", "5654", "2026-10-12", channel="beta"),
-    Release("26.1.7b", "macos", "5421", "2026-10-12", channel="beta"),
+    Release("26.1.7", "windows", "5654", "2026-10-12", source="https://www.image-line.com/fl-studio/download"),
+    Release("26.1.7", "macos", "5421", "2026-10-12", source="https://www.image-line.com/fl-studio/download"),
 )
 
 
