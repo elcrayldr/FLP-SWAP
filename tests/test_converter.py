@@ -79,6 +79,63 @@ class ConverterGuardrailTests(unittest.TestCase):
                 convert_flp(source, output, "26.1.7.5654")
             self.assertFalse(output.exists())
 
+    def test_downgrades_fl25_2_to_fl25_1_using_known_special_event_rules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "fl25_2.flp"
+            output = Path(directory) / "fl25_1.flp"
+            banner = "FL Studio 25.2.4.4960.4960\\x00".encode("utf-16le")
+            banner_event = bytes([0xC0, len(banner)]) + banner
+            playlist = bytes(range(80))
+            playlist_event = bytes([0xE9, len(playlist)]) + playlist
+            events = (
+                bytes([0xAC, 1, 1, 0])
+                + banner_event
+                + text_event(199, "25.2.4.4960")
+                + bytes([159]) + struct.pack("<I", 4960)
+                + playlist_event
+            )
+            source.write_bytes(make_flp(events))
+            original = source.read_bytes()
+
+            report = convert_flp(source, output, "25.1.6.4997")
+
+            result = output.read_bytes()
+            self.assertEqual(source.read_bytes(), original)
+            self.assertTrue(report["source_preserved"])
+            self.assertEqual(report["detected_source_version"], "25.2.4.4960")
+            self.assertEqual(report["target_version"], "25.1.6.4997")
+            self.assertEqual(report["migration"]["removed_known_fl25_events"], ["0xAC", "0xC0-banner"])
+            self.assertNotIn(bytes([0xAC, 1, 1, 0]), result)
+            self.assertNotIn(banner_event, result)
+            self.assertIn(struct.pack("<I", 4997), result)
+            self.assertFalse(report["compatibility_verified"])
+
+    def test_downgrades_fl25_playlist_records_to_fl24_record_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "fl25.flp"
+            output = Path(directory) / "fl24.flp"
+            banner = "FL Studio 25.2.4.4960.4960\\x00".encode("utf-16le")
+            banner_event = bytes([0xC0, len(banner)]) + banner
+            playlist = bytes(range(80)) + bytes(range(80))
+            playlist_event = bytes([0xE9, len(playlist)]) + playlist
+            events = (
+                bytes([0xAC, 1, 1, 0])
+                + banner_event
+                + text_event(199, "25.2.4.4960")
+                + bytes([159]) + struct.pack("<I", 4960)
+                + playlist_event
+            )
+            source.write_bytes(make_flp(events))
+            output_report = convert_flp(source, output, "24.1.0")
+            out_raw = output.read_bytes()
+            _, out_events, _ = __import__("flpswap.flp_migration", fromlist=["read_events"]).read_events(out_raw)
+            e9_payloads = [event.payload for event in out_events if event.event_id == 0xE9]
+            self.assertEqual(len(e9_payloads), 1)
+            self.assertEqual(len(e9_payloads[0]), 120)
+            self.assertEqual(e9_payloads[0], playlist[:60] + playlist[80:140])
+            self.assertEqual(output_report["migration"]["playlist_records_resized"], 2)
+            self.assertFalse(any(event.event_id == 0x9F for event in out_events))
+
 
 if __name__ == "__main__":
     unittest.main()
