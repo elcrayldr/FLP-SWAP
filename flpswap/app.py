@@ -173,8 +173,8 @@ class FLPSwapApp(tk.Tk):
             "compatibility_assessment": assessment_report,
             "conversion": {
                 "performed": False,
-                "status": "not_implemented",
-                "message": "La detección de versión no implica compatibilidad ni conversión.",
+                "status": "awaiting_user_conversion",
+                "message": "El análisis no modifica el proyecto; pulsa «Convertir copia» para ejecutar la reescritura con comprobaciones estructurales.",
             },
         }
         source_display = metadata.saved_version or "No identificada"
@@ -259,7 +259,7 @@ class FLPSwapApp(tk.Tk):
             return
         try:
             metadata = parse_flp_metadata(self.selected_file)
-            target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+            target_numeric = internal_version(self.target_version.get())
             assessment = assess_compatibility(metadata.saved_version, target_numeric)
             self.last_report["selected_target_version"] = target_numeric
             self.last_report["selected_target_label"] = self.target_version.get()
