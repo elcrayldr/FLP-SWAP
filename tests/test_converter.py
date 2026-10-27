@@ -154,6 +154,19 @@ class ConverterGuardrailTests(unittest.TestCase):
             self.assertEqual(clips[0], playlist[:60])
             self.assertEqual(report["migration"]["playlist_records_resized"], 1)
 
+    def test_converts_legacy_fruityloops_file_without_version_event_when_source_is_declared(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "fruityloops_1.flp"
+            output = Path(directory) / "fruityloops_copy.flp"
+            source.write_bytes(make_flp(bytes([1, 0x2A])))
+
+            report = convert_flp(source, output, "1.0.0", declared_source_version="1.0.0")
+
+            self.assertTrue(output.exists())
+            self.assertTrue(report["source_preserved"])
+            self.assertEqual(report["detected_source_version"], "1.0.0")
+            self.assertFalse(report["migration"]["target_supports_version_event"])
+
 
 if __name__ == "__main__":
     unittest.main()
