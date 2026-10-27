@@ -25,7 +25,7 @@ class EventInventory:
     event_id_counts: dict[int, int]
     event_payload_bytes_by_id: dict[int, int]
     version_payloads: tuple[str, ...]
-    unknown_or_unclassified_ids: tuple[int, ...]
+    event_ids_needing_mapping_review: tuple[int, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,7 +41,7 @@ class EventInventory:
                 str(k): v for k, v in sorted(self.event_payload_bytes_by_id.items())
             },
             "version_payloads": list(self.version_payloads),
-            "unclassified_event_ids": list(self.unknown_or_unclassified_ids),
+            "event_ids_needing_mapping_review": list(self.event_ids_needing_mapping_review),
         }
 
 
@@ -107,20 +107,10 @@ def inventory_flp(path: str | Path) -> EventInventory:
                 versions.append(candidate)
         offset = event_end
 
-    # The FLP event registry is not complete in this application. This field is
-    # intentionally explicit rather than falsely labelling IDs as known/unknown.
-    # IDs outside the commonly documented basic set are surfaced for review.
-    documented_basic_ids = set(range(0, 64)) | {64, 65, 66, 67, 68, 69, 70, 71, 72,
-        73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
-        91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
-        107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
-        121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
-        135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
-        149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
-        163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
-        177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190,
-        191, 192, 193, 194, 195, 196, 197, 198, 199}
-    unclassified = tuple(sorted(set(counts) - documented_basic_ids))
+    # IDs >= 200 are surfaced for migration-rule review. They are not labelled
+    # unsupported: many are legitimate FL Studio events, but this app has no
+    # complete semantic mapping for all of them.
+    needs_review = tuple(sorted(event_id for event_id in counts if event_id >= 200))
     return EventInventory(
         file_size_bytes=len(raw),
         sha256=hashlib.sha256(raw).hexdigest(),
@@ -132,7 +122,7 @@ def inventory_flp(path: str | Path) -> EventInventory:
         event_id_counts=dict(counts),
         event_payload_bytes_by_id=dict(payload_sizes),
         version_payloads=tuple(versions),
-        unknown_or_unclassified_ids=unclassified,
+        event_ids_needing_mapping_review=needs_review,
     )
 
 
@@ -147,7 +137,6 @@ def compare_inventories(before: EventInventory, after: EventInventory) -> dict[s
         }
         for event_id in all_ids
         if before.event_id_counts.get(event_id, 0) != after.event_id_counts.get(event_id, 0)
-        and event_id != 199
     ]
     return {
         "event_id_counts_match_except_version_event": not changes,
