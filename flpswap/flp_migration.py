@@ -112,6 +112,17 @@ def _is_fl25_banner(event: Event) -> bool:
 
 def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
     stream, events, source_has_fl25_format = read_events(raw)
+    # FL25.1 uses the 80-byte playlist record layout too, even though the 25.2
+    # banner/0xAC marker is absent. Detect the major version from the C7 event.
+    source_major = None
+    for event in events:
+        if event.event_id == 0xC7:
+            try:
+                source_major = int(event.payload.rstrip(b"\\x00").decode("ascii").split(".")[0])
+            except (ValueError, UnicodeDecodeError):
+                source_major = None
+            break
+    source_has_fl25_format = source_has_fl25_format or (source_major is not None and source_major >= 25)
     parts = [int(part) for part in target_version.split(".")]
     target_major = parts[0]
     target_minor = parts[1] if len(parts) > 1 else 0
