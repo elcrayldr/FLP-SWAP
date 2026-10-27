@@ -106,8 +106,8 @@ class FLPSwapApp(tk.Tk):
         self.output.insert("1.0", (
             "PASO 1 — Selecciona tu archivo .flp. La aplicación leerá la versión guardada dentro del proyecto, si está disponible.\n\n"
             "PASO 2 — Selecciona la versión de destino en la lista desplegable (por defecto, FL Studio 2026.1.7).\n\n"
-            "PASO 3 — Pulsa «Convertir copia». Se intentará una reescritura estructurada y se guardará otro archivo.\n"
-            "La compatibilidad funcional no está garantizada; conserva el original y prueba el resultado en FL Studio.\n"
+            "PASO 3 — Pulsa «Convertir copia». Se cambiarán los metadatos de versión en una copia, preservando los demás eventos byte a byte.\n"
+            "Esto NO traduce automáticamente funciones exclusivas de versiones nuevas; valida la copia en FL Studio.\n"
         ))
         self.output.configure(state="disabled")
         self.last_report: dict = {"application_version": __version__, "status": "idle"}
@@ -174,7 +174,7 @@ class FLPSwapApp(tk.Tk):
             "conversion": {
                 "performed": False,
                 "status": "awaiting_user_conversion",
-                "message": "El análisis no modifica el proyecto; pulsa «Convertir copia» para ejecutar la reescritura con comprobaciones estructurales.",
+                "message": "El análisis no modifica el proyecto; «Convertir copia» cambia solo los metadatos de versión y conserva los demás eventos.",
             },
         }
         source_display = metadata.saved_version or "No identificada"
@@ -238,7 +238,7 @@ class FLPSwapApp(tk.Tk):
             return
         self.last_report = {"application_version": __version__, "conversion": report}
         self._write(
-            "SE HA GENERADO UNA COPIA REESCRITA\n\n"
+            "SE HA GENERADO UNA COPIA CON METADATOS DE VERSIÓN MODIFICADOS\n\n"
             f"Origen: {report['source_path']}\n"
             f"Versión detectada: {report['detected_source_version']}\n"
             f"Versión seleccionada como origen: {report['declared_source_version'] or 'Auto-detectada'}\n"
@@ -247,13 +247,13 @@ class FLPSwapApp(tk.Tk):
             f"Eventos: {report['input_event_count']} → {report['output_event_count']}\n"
             f"Tamaño: {report['input_size_bytes']:,} → {report['output_size_bytes']:,} bytes\n"
             f"Original intacto: {'Sí' if report['source_preserved'] else 'NO'}\n\n"
-            "IMPORTANTE: REESCRITURA GENERADA, COMPATIBILIDAD NO VERIFICADA.\n"
+            "IMPORTANTE: METADATOS ACTUALIZADOS; NO ES UNA TRADUCCIÓN COMPLETA DE FUNCIONES.\n"
             "No es una garantía de compatibilidad total ni de conservación exacta del sonido.\n\n"
             "AVISOS:\n- " + "\n- ".join(report["warnings"])
         )
         messagebox.showwarning(
             "Copia generada; falta validación en FL Studio",
-            "Se ha guardado una copia reescrita. No se puede afirmar que sea compatible hasta abrirla y comprobarla en la versión de destino.",
+            "Se ha guardado una copia cambiando la versión declarada. Los demás eventos se preservan, pero eso no convierte automáticamente funciones nuevas para versiones antiguas. Comprueba el archivo en la versión de destino.",
         )
 
     def on_target_changed(self, _event=None) -> None:
