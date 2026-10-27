@@ -26,9 +26,24 @@ jobs:
         run: python -m pytest -q
       - name: Build portable folder
         run: pyinstaller --noconfirm --clean --windowed --name FLPSwap --collect-submodules flpswap flpswap\__main__.py
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
+          & $compiler installer\\FLPSwap.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload portable folder
         uses: actions/upload-artifact@v4
         with:
           name: FLPSwap-Windows-Portable
           path: dist/FLPSwap/
+          if-no-files-found: error
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: FLPSwap-Windows-Installer
+          path: dist/installer/*.exe
           if-no-files-found: error
