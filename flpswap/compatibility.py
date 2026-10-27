@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict, dataclass
 
 
-_VERSION_RE = re.compile(r"^(\d+(?:\.\d+){1,3})(?:[.-]?([0-9]+))?(?:[a-zA-Z].*)?$")
+_VERSION_RE = re.compile(r"^(\d+\.\d+\.\d+)(?:\.\d+)?(?:[a-zA-Z].*)?$")
 
 
 @dataclass(frozen=True)
