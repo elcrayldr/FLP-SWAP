@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox, ttk
 from flpswap import __version__
 from flpswap.flp_inspector import inspect_flp
 from flpswap.compatibility import assess_compatibility
+from flpswap.converter import ConversionError, convert_flp
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.version_detector import detect_installations
 
@@ -57,19 +58,34 @@ class FLPSwapApp(tk.Tk):
             text="1. Selecciona un proyecto FLP.  2. Elige la versión de destino.",
         ).pack(anchor="w", pady=(4, 16))
 
-        actions = ttk.Frame(outer)
-        actions.pack(fill="x", pady=(0, 10))
-        ttk.Button(actions, text="1. Seleccionar proyecto FLP", command=self.choose_file).pack(side="left")
-        ttk.Label(actions, text="2. Versión destino:").pack(side="left", padx=(12, 5))
+        file_row = ttk.Frame(outer)
+        file_row.pack(fill="x", pady=(0, 8))
+        ttk.Button(file_row, text="1. Seleccionar proyecto FLP", command=self.choose_file).pack(side="left")
+
+        version_row = ttk.Frame(outer)
+        version_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(version_row, text="Versión de origen:").pack(side="left")
+        self.source_version = tk.StringVar(value="Auto-detectar desde el FLP")
+        self.source_combo = ttk.Combobox(
+            version_row, textvariable=self.source_version,
+            values=("Auto-detectar desde el FLP",) + TARGET_VERSIONS,
+            state="readonly", width=25,
+        )
+        self.source_combo.pack(side="left", padx=(6, 14))
+        ttk.Label(version_row, text="Versión de destino:").pack(side="left")
         self.target_version = tk.StringVar(value="FL Studio 26.1.7")
         self.target_combo = ttk.Combobox(
-            actions, textvariable=self.target_version, values=TARGET_VERSIONS,
+            version_row, textvariable=self.target_version, values=TARGET_VERSIONS,
             state="readonly", width=22,
         )
-        self.target_combo.pack(side="left")
+        self.target_combo.pack(side="left", padx=6)
         self.target_combo.bind("<<ComboboxSelected>>", self.on_target_changed)
-        ttk.Button(actions, text="Exportar informe", command=self.export_report).pack(side="left", padx=8)
-        ttk.Button(actions, text="Detectar FL instalado", command=self.show_installations).pack(side="left")
+        ttk.Button(version_row, text="2. Convertir copia", command=self.convert_selected).pack(side="left", padx=6)
+
+        report_row = ttk.Frame(outer)
+        report_row.pack(fill="x", pady=(0, 8))
+        ttk.Button(report_row, text="Exportar informe", command=self.export_report).pack(side="left")
+        ttk.Button(report_row, text="Detectar FL instalado", command=self.show_installations).pack(side="left", padx=8)
 
         self.file_label = ttk.Label(outer, text="Ningún proyecto seleccionado")
         self.file_label.pack(anchor="w", pady=8)
@@ -83,7 +99,8 @@ class FLPSwapApp(tk.Tk):
         self.output.insert("1.0", (
             "PASO 1 — Selecciona tu archivo .flp. La aplicación leerá la versión guardada dentro del proyecto, si está disponible.\n\n"
             "PASO 2 — Selecciona la versión de destino en la lista desplegable (por defecto, FL Studio 26.1.7).\n\n"
-            "IMPORTANTE: esta compilación inspecciona el proyecto y compara versiones. Todavía no modifica ni convierte archivos.\n"
+            "PASO 3 — Pulsa «Convertir copia». Se intentará una reescritura estructurada y se guardará otro archivo.\n"
+            "La compatibilidad funcional no está garantizada; conserva el original y prueba el resultado en FL Studio.\n"
         ))
         self.output.configure(state="disabled")
         self.last_report: dict = {"application_version": __version__, "status": "idle"}
@@ -167,6 +184,62 @@ class FLPSwapApp(tk.Tk):
             "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
             "Esta versión de prueba no modifica el proyecto.\n\n"
             "AVISOS:\n- " + "\n- ".join(assessment_report["warnings"])
+        )
+
+    def convert_selected(self) -> None:
+        if self.selected_file is None:
+            messagebox.showinfo("Selecciona un proyecto", "Primero selecciona el archivo FLP que quieres convertir.")
+            return
+        target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+        selected_source = self.source_version.get()
+        declared_source = (
+            None if selected_source == "Auto-detectar desde el FLP"
+            else selected_source.replace("FL Studio ", "").strip()
+        )
+        suggested = f"{self.selected_file.stem}_FLPSWAP_{target_numeric}.flp"
+        output_name = filedialog.asksaveasfilename(
+            title="Guardar proyecto convertido como copia",
+            initialdir=str(self.selected_file.parent),
+            initialfile=suggested,
+            defaultextension=".flp",
+            filetypes=[("Proyecto FL Studio", "*.flp")],
+        )
+        if not output_name:
+            return
+        try:
+            source_meta = parse_flp_metadata(self.selected_file)
+            if declared_source and source_meta.saved_version and not source_meta.saved_version.startswith(declared_source):
+                proceed = messagebox.askyesno(
+                    "La versión seleccionada no coincide",
+                    f"El archivo indica {source_meta.saved_version}, pero has seleccionado {declared_source} como origen.\n\n"
+                    "¿Quieres continuar? La versión detectada del archivo se usará como referencia real.",
+                )
+                if not proceed:
+                    return
+            report = convert_flp(
+                self.selected_file, output_name, target_numeric, declared_source_version=declared_source
+            )
+        except (ConversionError, OSError, ValueError, FlpFormatError) as exc:
+            messagebox.showerror("Conversión cancelada", str(exc))
+            return
+        self.last_report = {"application_version": __version__, "conversion": report}
+        self._write(
+            "SE HA GENERADO UNA COPIA REESCRITA\n\n"
+            f"Origen: {report['source_path']}\n"
+            f"Versión detectada: {report['detected_source_version']}\n"
+            f"Versión seleccionada como origen: {report['declared_source_version'] or 'Auto-detectada'}\n"
+            f"Destino seleccionado: {report['target_version']}\n"
+            f"Archivo resultante: {report['output_path']}\n\n"
+            f"Eventos: {report['input_event_count']} → {report['output_event_count']}\n"
+            f"Tamaño: {report['input_size_bytes']:,} → {report['output_size_bytes']:,} bytes\n"
+            f"Original intacto: {'Sí' if report['source_preserved'] else 'NO'}\n\n"
+            "IMPORTANTE: REESCRITURA GENERADA, COMPATIBILIDAD NO VERIFICADA.\n"
+            "No es una garantía de compatibilidad total ni de conservación exacta del sonido.\n\n"
+            "AVISOS:\n- " + "\n- ".join(report["warnings"])
+        )
+        messagebox.showwarning(
+            "Copia generada; falta validación en FL Studio",
+            "Se ha guardado una copia reescrita. No se puede afirmar que sea compatible hasta abrirla y comprobarla en la versión de destino.",
         )
 
     def on_target_changed(self, _event=None) -> None:
