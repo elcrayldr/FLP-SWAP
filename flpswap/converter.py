@@ -1,20 +1,14 @@
-"""Byte-preserving FLP version metadata patcher.
-
-This deliberately does not claim to translate version-specific project features.
-It rewrites only the FLVersion event (and FLBuild when a target build is supplied),
-preserving all other event bytes exactly. This avoids PyFLP re-serialization losses,
-but metadata patching alone cannot make unsupported project features compatible.
-"""
+"""Version-aware FLP converter using conservative, documented event migrations."""
 from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-import struct
 import tempfile
 from typing import Any
 
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.flp_diagnostics import inventory_flp, compare_inventories
+from flpswap.flp_migration import MigrationError, migrate_event_stream
 
 
 class ConversionError(RuntimeError):
@@ -29,105 +23,18 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _read_varint(data: bytes, offset: int) -> tuple[int, int]:
-    value = 0
-    shift = 0
-    while offset < len(data) and shift <= 28:
-        byte = data[offset]
-        offset += 1
-        value |= (byte & 0x7F) << shift
-        if not byte & 0x80:
-            return value, offset
-        shift += 7
-    raise ConversionError("FLP contiene una longitud variable truncada o inválida.")
-
-
-def _encode_varint(value: int) -> bytes:
-    if value < 0:
-        raise ValueError("Variable length cannot be negative")
-    result = bytearray()
-    while value >= 0x80:
-        result.append((value & 0x7F) | 0x80)
-        value >>= 7
-    result.append(value)
-    return bytes(result)
-
-
-def _rewrite_version_event(raw: bytes, target_version: str) -> tuple[bytes, int, bool]:
-    """Rewrite event 199 and optional fixed-size FLBuild event 159, preserving other bytes."""
-    if len(raw) < 22 or raw[:4] != b"FLhd":
-        raise ConversionError("No es un contenedor FLP reconocido.")
-    header_len = struct.unpack_from("<I", raw, 4)[0]
-    if header_len != 6 or raw[14:18] != b"FLdt":
-        raise ConversionError("La cabecera FLP no tiene el formato esperado.")
-    event_size = struct.unpack_from("<I", raw, 18)[0]
-    if 22 + event_size != len(raw):
-        raise ConversionError("El tamaño del bloque FLdt no coincide con el archivo.")
-    events = raw[22:]
-    out = bytearray()
-    offset = 0
-    version_count = 0
-    build_count = 0
-    parts = target_version.split(".")
-    build_value = int(parts[3]) if len(parts) == 4 else None
-
-    while offset < len(events):
-        event_start = offset
-        event_id = events[offset]
-        offset += 1
-        if event_id <= 63:
-            size = 1
-        elif event_id <= 127:
-            size = 2
-        elif event_id <= 191:
-            size = 4
-        else:
-            size, offset = _read_varint(events, offset)
-        payload_start = offset
-        payload_end = payload_start + size
-        if payload_end > len(events):
-            raise ConversionError(f"Evento FLP {event_id} truncado.")
-        payload = events[payload_start:payload_end]
-
-        if event_id == 199:
-            version_count += 1
-            if version_count > 1:
-                raise ConversionError("El FLP contiene varios eventos de versión; no se modificará ambiguamente.")
-            encoded = target_version.encode("ascii") + b"\x00"
-            out.append(event_id)
-            out.extend(_encode_varint(len(encoded)))
-            out.extend(encoded)
-        elif event_id == 159 and build_value is not None:
-            # ProjectID.FLBuild in PyFLP: DWORD + 31 = event ID 159.
-            build_count += 1
-            out.append(event_id)
-            out.extend(struct.pack("<I", build_value))
-        else:
-            # Preserve every non-target event, including unknown plugin data, byte-for-byte.
-            out.extend(events[event_start:payload_end])
-        offset = payload_end
-
-    if version_count != 1:
-        raise ConversionError("No se encontró exactamente un evento FLVersion (ID 199).")
-    if build_value is not None and build_count > 1:
-        raise ConversionError("El FLP contiene varios eventos FLBuild; no se modificará ambiguamente.")
-
-    rebuilt = bytearray(raw[:22])
-    rebuilt[18:22] = len(out).to_bytes(4, "little")
-    rebuilt.extend(out)
-    return bytes(rebuilt), version_count, bool(build_count and build_value is not None)
-
-
 def convert_flp(
     source_path: str | Path,
     output_path: str | Path,
     target_version: str,
     declared_source_version: str | None = None,
 ) -> dict[str, Any]:
-    """Create a byte-preserving copy with the requested FL Studio version metadata.
+    """Write a new FLP using version-aware rules; never overwrite the source.
 
-    This is not a full semantic downgrade/upgrade. Only the version string and,
-    when provided, the FLBuild event are changed. All other event bytes are preserved.
+    Implemented migration rules cover FL25.2+ framing (0xAC / UTF-16 version
+    banner) and playlist record sizes when targeting FL24 or earlier. Unknown
+    plugin/event semantics are preserved, not guessed; compatibility still
+    needs opening and playback validation in the target FL Studio version.
     """
     source = Path(source_path).expanduser().resolve()
     output = Path(output_path).expanduser().resolve()
@@ -155,9 +62,9 @@ def convert_flp(
     original_hash = _sha256(source)
     raw = source.read_bytes()
     try:
-        rewritten, version_count, build_updated = _rewrite_version_event(raw, target_version)
-    except (ValueError, struct.error) as exc:
-        raise ConversionError(f"No se pudo reescribir la versión del FLP: {exc}") from exc
+        rewritten, migration_report = migrate_event_stream(raw, target_version)
+    except (ValueError, MigrationError) as exc:
+        raise ConversionError(f"No se pudo migrar el proyecto: {exc}") from exc
 
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -174,9 +81,9 @@ def convert_flp(
         after_inventory = inventory_flp(temp_path)
         event_comparison = compare_inventories(before_inventory, after_inventory)
         if not after.valid_container or after.saved_version != target_version:
-            raise ConversionError("La comprobación posterior no coincide con la versión solicitada.")
-        if not event_comparison["event_id_counts_match_except_version_event"]:
-            raise ConversionError("Cambió el inventario de eventos; se cancela la conversión.")
+            raise ConversionError(
+                f"La validación posterior esperaba {target_version}, pero detectó {after.saved_version!r}."
+            )
         if _sha256(source) != original_hash:
             raise ConversionError("El archivo original cambió durante el proceso.")
         temp_path.replace(output)
@@ -192,30 +99,36 @@ def convert_flp(
             except OSError:
                 pass
 
+    source_hash_after = _sha256(source)
+    warnings = [
+        "La conversión aplica reglas conocidas de estructura FLP; no reconstruye automáticamente parámetros privados de todos los plugins.",
+        "Los eventos desconocidos se conservan salvo los marcadores FL25.2+ documentados como incompatibles con destinos anteriores a FL25.2.",
+        "Los proyectos que contienen funciones exclusivas de una versión posterior pueden abrirse con funciones omitidas o no reproducir exactamente igual.",
+        "Para validar compatibilidad real, abre la copia en la versión destino y comprueba patrones, playlist, automatizaciones, mezclador, plugins, muestras y reproducción.",
+    ]
+    if migration_report["removed_known_fl25_events"]:
+        warnings.append("Se eliminaron marcadores estructurales de FL25.2+ incompatibles con la versión destino.")
+    if migration_report["playlist_records_resized"]:
+        warnings.append("Los clips de playlist se adaptaron al tamaño de registro documentado para la versión de destino; verifica posición, duración y offsets.")
+
     return {
-        "status": "version_metadata_rewritten_unverified",
+        "status": "version_aware_migration_created_unverified",
         "source_path": str(source),
         "output_path": str(output),
         "detected_source_version": before.saved_version,
         "declared_source_version": declared_source_version,
         "target_version": target_version,
         "source_sha256_before": original_hash,
-        "source_sha256_after": _sha256(source),
-        "source_preserved": _sha256(source) == original_hash,
+        "source_sha256_after": source_hash_after,
+        "source_preserved": source_hash_after == original_hash,
         "input_event_count": before.event_count,
         "output_event_count": after.event_count,
         "event_inventory_before": before_inventory.to_dict(),
         "event_inventory_after": after_inventory.to_dict(),
         "event_inventory_comparison": event_comparison,
+        "migration": migration_report,
         "input_size_bytes": source.stat().st_size,
         "output_size_bytes": output.stat().st_size,
-        "version_events_rewritten": version_count,
-        "build_event_updated": build_updated,
         "compatibility_verified": False,
-        "warnings": [
-            "Se ha cambiado la versión declarada del proyecto, no se han traducido automáticamente todas las funciones del FLP.",
-            "Todos los bytes de los eventos distintos de FLVersion y el FLBuild opcional se han preservado sin reserializarlos.",
-            "Los plugins VST/VST3, plugins nativos, automatizaciones y eventos introducidos después de la versión destino pueden seguir siendo incompatibles.",
-            "Abre la copia en la versión destino y comprueba patrones, automatizaciones, mezclador, plugins, muestras y reproducción.",
-        ],
+        "warnings": warnings,
     }
