@@ -56,8 +56,8 @@ def convert_flp(
         before_inventory = inventory_flp(source)
     except (OSError, ValueError, FlpFormatError) as exc:
         raise ConversionError(f"El archivo de origen no supera la validación FLP: {exc}") from exc
-    if not before.saved_version:
-        raise ConversionError("No se pudo detectar la versión guardada; no se ha creado ningún archivo.")
+    if not before.saved_version and not declared_source_version:
+        raise ConversionError("Este FLP no contiene un evento de versión detectable. Selecciona manualmente la versión de origen y vuelve a intentarlo.")
 
     original_hash = _sha256(source)
     raw = source.read_bytes()
@@ -80,9 +80,12 @@ def convert_flp(
         after = parse_flp_metadata(temp_path)
         after_inventory = inventory_flp(temp_path)
         event_comparison = compare_inventories(before_inventory, after_inventory)
-        if not after.valid_container or after.saved_version != target_version:
+        target_parts = [int(part) for part in target_version.split(".")]
+        target_supports_version_event = target_parts[0] > 1 or (target_parts[0] == 1 and (target_parts[1] > 3 or (target_parts[1] == 3 and target_parts[2] >= 9)))
+        expected_saved_version = target_version if target_supports_version_event else None
+        if not after.valid_container or after.saved_version != expected_saved_version:
             raise ConversionError(
-                f"La validación posterior esperaba {target_version}, pero detectó {after.saved_version!r}."
+                f"La validación posterior esperaba {expected_saved_version!r}, pero detectó {after.saved_version!r}."
             )
         if _sha256(source) != original_hash:
             raise ConversionError("El archivo original cambió durante el proceso.")
@@ -115,7 +118,7 @@ def convert_flp(
         "status": "version_aware_migration_created_unverified",
         "source_path": str(source),
         "output_path": str(output),
-        "detected_source_version": before.saved_version,
+        "detected_source_version": before.saved_version or declared_source_version,
         "declared_source_version": declared_source_version,
         "target_version": target_version,
         "source_sha256_before": original_hash,
