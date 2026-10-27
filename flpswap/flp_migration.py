@@ -50,7 +50,7 @@ def _write_varint(value: int) -> bytes:
 
 
 def _has_fl25_banner(raw: bytes) -> bool:
-    return b"FL Studio 25.".encode("utf-16le") in raw or b"FL Studio 26.".encode("utf-16le") in raw
+    return "FL Studio 25.".encode("utf-16le") in raw or "FL Studio 26.".encode("utf-16le") in raw
 
 
 def read_events(raw: bytes) -> tuple[bytes, list[Event], bool]:
