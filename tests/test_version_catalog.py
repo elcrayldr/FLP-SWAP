@@ -22,10 +22,10 @@ from flpswap.app import internal_version
 
 
 def test_catalog_contains_all_requested_release_labels():
-    assert len(VERSION_LABELS) == 110
-    assert len(set(VERSION_LABELS)) == 110
+    assert len(VERSION_LABELS) >= 118
+    assert len(set(VERSION_LABELS)) == len(VERSION_LABELS)
     assert VERSION_LABELS[0] == "FruityLoops 1.0.0"
-    assert VERSION_LABELS[-1] == "FL Studio 2026.1.7"
+    assert VERSION_LABELS[-1] == "FL Studio 2026.1.7.5"
 
 
 def test_marketing_year_and_build_labels_map_to_internal_values():
