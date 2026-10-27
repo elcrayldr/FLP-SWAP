@@ -128,6 +128,7 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
     target_minor = parts[1] if len(parts) > 1 else 0
     target_patch = parts[2] if len(parts) > 2 else 0
     target_build = parts[3] if len(parts) > 3 else None
+    target_supports_version_event = target_major > 1 or (target_major == 1 and (target_minor > 3 or (target_minor == 3 and target_patch >= 9)))
     target_is_pre_25_2 = target_major < 25 or (target_major == 25 and target_minor < 2)
     target_playlist_size = 80 if target_major >= 25 else (60 if target_major >= 21 else 32)
 
@@ -145,14 +146,15 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
         payload = event.payload
         original_event_ids.append(event_id)
 
-        if event_id == 0xC7:  # FLVersion: ASCII, null-terminated
+        if event_id == 0xC7:  # FLVersion: ASCII, introduced in early FruityLoops releases
             version_count += 1
             if version_count > 1:
                 raise MigrationError("Hay varios eventos FLVersion; no se modificará de forma ambigua.")
-            version = ".".join(str(x) for x in parts)
-            payload = version.encode("ascii") + b"\x00"
-            output.extend(_encode_event(event_id, payload))
-            output_event_ids.append(event_id)
+            if target_supports_version_event:
+                version = ".".join(str(x) for x in parts)
+                payload = version.encode("ascii") + b"\x00"
+                output.extend(_encode_event(event_id, payload))
+                output_event_ids.append(event_id)
             continue
 
         if event_id == 0x9F:  # FLBuild
@@ -191,8 +193,12 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
         output.extend(_encode_event(event_id, payload))
         output_event_ids.append(event_id)
 
-    if version_count != 1:
-        raise MigrationError("No se encontró exactamente un evento FLVersion (0xC7).")
+    version_event_added = False
+    if target_supports_version_event and version_count == 0:
+        version = ".".join(str(x) for x in parts)
+        output[:0] = _encode_event(0xC7, version.encode("ascii") + b"\x00")
+        output_event_ids.insert(0, 0xC7)
+        version_event_added = True
     if build_count > 1:
         raise MigrationError("Hay varios eventos FLBuild; no se modificará de forma ambigua.")
 
@@ -205,7 +211,9 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
         "removed_known_fl25_events": removed_25_events,
         "playlist_records_resized": resized_playlist_records,
         "playlist_records_seen": playlist_records,
-        "version_events_rewritten": version_count,
+        "version_events_rewritten": version_count if target_supports_version_event else 0,
+        "version_event_added": version_event_added,
+        "target_supports_version_event": target_supports_version_event,
         "build_event_updated": bool(build_count and target_build is not None),
         "event_count_before": len(events),
         "event_count_after": len(output_event_ids),
