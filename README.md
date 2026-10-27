@@ -8,7 +8,7 @@ El conversor ahora procesa el flujo de eventos del FLP y aplica reglas explícit
 
 - Reconoce la excepción de FL Studio 25.2+: el evento `0xAC` tiene un payload de 3 bytes, no de 4.
 - Al convertir proyectos FL 25.2+ a destinos anteriores a 25.2, elimina el marcador `0xAC` y el banner de versión UTF-16LE `0xC0` que esos destinos no reconocen.
-- Adapta el tamaño de los registros de clips de playlist `0xE9`: 80 bytes en FL25, 60 en FL21–24 y 32 antes de FL21. La migración actual conserva el prefijo conocido de cada registro.
+- **No** recorta registros de clips de playlist `0xE9` para simular una conversión. Si el destino requiere un formato de playlist más antiguo y no existe una migración campo por campo validada, detiene la conversión para evitar generar un proyecto corrupto.
 - Actualiza el evento `FLVersion` y el número de build cuando el destino especifica un build.
 - Si el destino no especifica build, elimina el build de origen para no dejar metadatos contradictorios.
 - Valida el contenedor resultante y conserva intacto el archivo original.
@@ -17,7 +17,7 @@ Estas reglas se basan en documentación pública de análisis del formato FLP y 
 
 ## Límite de compatibilidad
 
-El motor tiene migraciones reales para las diferencias estructurales anteriores, pero no puede reconstruir genéricamente el estado privado de cualquier plugin ni adivinar semántica de todos los eventos desconocidos. En particular, una conversión entre versiones mayores puede conservar parámetros que la versión de destino no entiende. Por eso el informe distingue entre **archivo convertido** y **compatibilidad verificada**. La prueba final requiere abrir y reproducir el proyecto en la versión destino.
+El motor tiene reglas limitadas para algunas diferencias estructurales, pero todavía no es un conversor universal. No puede reconstruir genéricamente el estado privado de cualquier plugin ni adivinar la semántica de todos los eventos desconocidos. En particular, una conversión entre versiones mayores puede conservar parámetros que la versión de destino no entiende. Por eso el informe distingue entre **archivo convertido** y **compatibilidad verificada**. La prueba final requiere abrir y reproducir el proyecto en la versión destino.
 
 ## Uso
 
@@ -54,4 +54,4 @@ GitHub Actions genera los artefactos de Windows en [Actions](https://github.com/
 
 ## Próximas reglas
 
-El siguiente trabajo es ampliar el catálogo de migraciones con fixtures públicos de proyectos de versiones anteriores y pruebas de apertura en la aplicación original. Las reglas se añadirán por diferencia de versión/evento observada; no se deben eliminar datos desconocidos solo por su número de evento.
+El siguiente trabajo es crear fixtures de proyectos reales guardados por cada versión y probar apertura/reproducción en FL Studio. Las reglas se añadirán solo tras verificar diferencias entre archivos; no se deben eliminar ni recortar datos desconocidos solo por su número de evento.
