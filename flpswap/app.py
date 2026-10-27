@@ -11,6 +11,20 @@ from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.version_detector import detect_installations
 
 
+TARGET_VERSIONS = (
+    "FL Studio 11.0.0", "FL Studio 11.1.0", "FL Studio 11.1.3",
+    "FL Studio 12.0.0", "FL Studio 12.1.0", "FL Studio 12.2.0",
+    "FL Studio 12.3.0", "FL Studio 12.4.0", "FL Studio 12.5.0",
+    "FL Studio 12.5.1", "FL Studio 20.0.0", "FL Studio 20.1.0",
+    "FL Studio 20.5.0", "FL Studio 20.6.0", "FL Studio 20.7.0",
+    "FL Studio 20.8.0", "FL Studio 20.9.0", "FL Studio 20.9.2",
+    "FL Studio 21.0.0", "FL Studio 21.1.0", "FL Studio 21.2.0",
+    "FL Studio 21.2.3", "FL Studio 24.1.0", "FL Studio 24.1.2",
+    "FL Studio 2025.1.0", "FL Studio 2025.2.5", "FL Studio 26.1.1",
+    "FL Studio 26.1.4", "FL Studio 26.1.7",
+)
+
+
 class FLPSwapApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -40,17 +54,22 @@ class FLPSwapApp(tk.Tk):
         ttk.Label(outer, text="FLP SWAP", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             outer,
-            text="Inspección de proyectos FLP · conversión todavía no habilitada",
+            text="1. Selecciona un proyecto FLP.  2. Elige la versión de destino.",
         ).pack(anchor="w", pady=(4, 16))
 
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=(0, 10))
-        ttk.Button(actions, text="Seleccionar proyecto FLP", command=self.choose_file).pack(side="left")
-        ttk.Button(actions, text="Detectar FL Studio instalado", command=self.show_installations).pack(side="left", padx=8)
-        ttk.Label(actions, text="Versión destino:").pack(side="left", padx=(12, 4))
-        self.target_version = tk.StringVar(value="21.3.6")
-        ttk.Entry(actions, textvariable=self.target_version, width=12).pack(side="left")
+        ttk.Button(actions, text="1. Seleccionar proyecto FLP", command=self.choose_file).pack(side="left")
+        ttk.Label(actions, text="2. Versión destino:").pack(side="left", padx=(12, 5))
+        self.target_version = tk.StringVar(value="FL Studio 26.1.7")
+        self.target_combo = ttk.Combobox(
+            actions, textvariable=self.target_version, values=TARGET_VERSIONS,
+            state="readonly", width=22,
+        )
+        self.target_combo.pack(side="left")
+        self.target_combo.bind("<<ComboboxSelected>>", self.on_target_changed)
         ttk.Button(actions, text="Exportar informe", command=self.export_report).pack(side="left", padx=8)
+        ttk.Button(actions, text="Detectar FL instalado", command=self.show_installations).pack(side="left")
 
         self.file_label = ttk.Label(outer, text="Ningún proyecto seleccionado")
         self.file_label.pack(anchor="w", pady=8)
@@ -62,10 +81,9 @@ class FLPSwapApp(tk.Tk):
         )
         self.output.pack(fill="both", expand=True)
         self.output.insert("1.0", (
-            "Estado: inspección de solo lectura\n\n"
-            "Selecciona un FLP para consultar su estructura y la versión guardada si puede "
-            "identificarse en el archivo. Introduce una versión de destino para evaluar la diferencia. "
-            "La evaluación no convierte el proyecto ni garantiza que abra.\n"
+            "PASO 1 — Selecciona tu archivo .flp. La aplicación leerá la versión guardada dentro del proyecto, si está disponible.\n\n"
+            "PASO 2 — Selecciona la versión de destino en la lista desplegable (por defecto, FL Studio 26.1.7).\n\n"
+            "IMPORTANTE: esta compilación inspecciona el proyecto y compara versiones. Todavía no modifica ni convierte archivos.\n"
         ))
         self.output.configure(state="disabled")
         self.last_report: dict = {"application_version": __version__, "status": "idle"}
@@ -104,7 +122,8 @@ class FLPSwapApp(tk.Tk):
 
         self.file_label.configure(text=str(self.selected_file))
         try:
-            assessment = assess_compatibility(metadata.saved_version, self.target_version.get().strip())
+            target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+            assessment = assess_compatibility(metadata.saved_version, target_numeric)
             assessment_report = assessment.to_dict()
         except ValueError as exc:
             messagebox.showerror("Versión destino no válida", str(exc))
@@ -112,6 +131,7 @@ class FLPSwapApp(tk.Tk):
 
         self.last_report = {
             "application_version": __version__,
+            "selected_target_version": target_numeric,
             "inspection": {
                 "path": inspected.path,
                 "size_bytes": inspected.size_bytes,
@@ -129,7 +149,52 @@ class FLPSwapApp(tk.Tk):
                 "message": "La detección de versión no implica compatibilidad ni conversión.",
             },
         }
-        self._write(json.dumps(self.last_report, indent=2, ensure_ascii=False))
+        source_display = metadata.saved_version or "No identificada"
+        relation_text = {
+            "same_version": "El proyecto y la versión de destino coinciden.",
+            "source_older_than_target": "El proyecto parece proceder de una versión anterior a la seleccionada.",
+            "source_newer_than_target": "ATENCIÓN: el proyecto parece proceder de una versión posterior a la seleccionada.",
+            "unknown": "No se ha podido determinar con seguridad la versión de origen.",
+        }.get(assessment_report["relation"], assessment_report["relation"])
+        self._write(
+            f"PROYECTO: {self.selected_file.name}\\n"
+            f"VERSIÓN DETECTADA EN EL FLP: {source_display}\\n"
+            f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\\n\\n"
+            f"RESULTADO: {relation_text}\\n\\n"
+            f"Tamaño: {inspected.size_bytes:,} bytes\\n"
+            f"Eventos FLP analizados: {metadata.event_count}\\n"
+            f"Contenedor FLP válido: {'Sí' if metadata.valid_container else 'No'}\\n\\n"
+            "ESTADO DE CONVERSIÓN: NO REALIZADA.\\n"
+            "Esta versión de prueba no modifica el proyecto.\\n\\n"
+            "AVISOS:\\n- " + "\\n- ".join(assessment_report["warnings"])
+        )
+
+    def on_target_changed(self, _event=None) -> None:
+        if self.selected_file is None:
+            return
+        try:
+            metadata = parse_flp_metadata(self.selected_file)
+            target_numeric = self.target_version.get().replace("FL Studio ", "").strip()
+            assessment = assess_compatibility(metadata.saved_version, target_numeric)
+            self.last_report["selected_target_version"] = target_numeric
+            self.last_report["compatibility_assessment"] = assessment.to_dict()
+            source_display = metadata.saved_version or "No identificada"
+            relation_text = {
+                "same_version": "El proyecto y la versión de destino coinciden.",
+                "source_older_than_target": "El proyecto parece proceder de una versión anterior a la seleccionada.",
+                "source_newer_than_target": "ATENCIÓN: el proyecto parece proceder de una versión posterior a la seleccionada.",
+                "unknown": "No se ha podido determinar con seguridad la versión de origen.",
+            }.get(assessment.relation, assessment.relation)
+            self._write(
+                f"PROYECTO: {self.selected_file.name}\\n"
+                f"VERSIÓN DETECTADA EN EL FLP: {source_display}\\n"
+                f"VERSIÓN DE DESTINO SELECCIONADA: {target_numeric}\\n\\n"
+                f"RESULTADO: {relation_text}\\n\\n"
+                "ESTADO DE CONVERSIÓN: NO REALIZADA.\\n"
+                "Esta versión de prueba no modifica el proyecto."
+            )
+        except (OSError, ValueError, FlpFormatError) as exc:
+            messagebox.showerror("No se pudo actualizar el análisis", str(exc))
 
     def show_installations(self) -> None:
         installs = detect_installations()
