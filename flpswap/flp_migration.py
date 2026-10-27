@@ -118,7 +118,7 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
     for event in events:
         if event.event_id == 0xC7:
             try:
-                source_major = int(event.payload.rstrip(b"\\x00").decode("ascii").split(".")[0])
+                source_major = int(event.payload.rstrip(b"\x00").decode("ascii").split(".")[0])
             except (ValueError, UnicodeDecodeError):
                 source_major = None
             break
