@@ -10,7 +10,7 @@ def test_windows_and_macos_builds_are_separate():
 def test_fl_studio_26_1_7_build_5654_is_identified():
     release = find_release("26.1.7", "windows", "5654")
     assert release is not None
-    assert release.channel == "stable"
+    assert release.channel == "release"
 
 
 def test_unknown_build_is_not_guessed():
