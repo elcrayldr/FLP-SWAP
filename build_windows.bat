@@ -22,7 +22,7 @@ if errorlevel 1 exit /b 1
 pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
-pyinstaller --noconfirm --clean --windowed --name FLPSwap --collect-submodules flpswap flpswap\__main__.py
+pyinstaller --noconfirm --clean --windowed --name FLPSwap --collect-submodules flpswap --collect-all pyflp flpswap\__main__.py
 if errorlevel 1 (
   echo ERROR: PyInstaller build failed.
   exit /b 1
