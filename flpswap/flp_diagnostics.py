@@ -80,6 +80,7 @@ def inventory_flp(path: str | Path) -> EventInventory:
         )
 
     events = raw[start:end]
+    has_fl25_banner = "FL Studio 25.".encode("utf-16le") in raw or "FL Studio 26.".encode("utf-16le") in raw
     offset = 0
     counts: Counter[int] = Counter()
     payload_sizes: Counter[int] = Counter()
@@ -87,7 +88,9 @@ def inventory_flp(path: str | Path) -> EventInventory:
     while offset < len(events):
         event_id = events[offset]
         offset += 1
-        if event_id <= 63:
+        if event_id == 0xAC and has_fl25_banner:
+            size = 3
+        elif event_id <= 63:
             size = 1
         elif event_id <= 127:
             size = 2
