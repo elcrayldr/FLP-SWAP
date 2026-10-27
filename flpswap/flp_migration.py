@@ -144,10 +144,13 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
             output_event_ids.append(event_id)
             continue
 
-        if event_id == 0x9F and target_build is not None:  # FLBuild
+        if event_id == 0x9F:  # FLBuild
             build_count += 1
             if build_count > 1:
                 raise MigrationError("Hay varios eventos FLBuild; no se modificará de forma ambigua.")
+            if target_build is None:
+                # Do not leave a contradictory source build beside the new version.
+                continue
             output.extend(_encode_event(event_id, struct.pack("<I", target_build)))
             output_event_ids.append(event_id)
             continue
@@ -179,7 +182,7 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
 
     if version_count != 1:
         raise MigrationError("No se encontró exactamente un evento FLVersion (0xC7).")
-    if target_build is not None and build_count > 1:
+    if build_count > 1:
         raise MigrationError("Hay varios eventos FLBuild; no se modificará de forma ambigua.")
 
     rebuilt = bytearray(raw[:22])
