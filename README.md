@@ -12,14 +12,9 @@ Portable Windows application for inspecting FL Studio projects and attempting a 
 4. Choose a new output filename and run **Convert copy**.
 5. FLP-SWAP checks the output container and saved version, reports event counts and preserves the original file.
 
-The version list currently includes:
-- FL Studio 11.0.0, 11.1.0, 11.1.3
-- FL Studio 12.0.0, 12.1.0, 12.2.0, 12.3.0, 12.4.0, 12.5.0, 12.5.1
-- FL Studio 20.0.0, 20.1.0, 20.5.0, 20.6.0, 20.7.0, 20.8.0, 20.9.0, 20.9.2
-- FL Studio 21.0.0, 21.1.0, 21.2.0, 21.2.3
-- FL Studio 24.1.0, 24.1.2
-- FL Studio 2025.1.0, 2025.2.5
-- FL Studio 26.1.1, 26.1.4, 26.1.7
+The version selectors include all **110 release labels** requested for this project, from FruityLoops 1.0.0 through FL Studio 2026.1.7. This includes historical 1.x–3.x FruityLoops versions, FL Studio 4–21 releases, 2024–2026 marketing-year labels, and the explicit build variants supplied for 12.5.1, 20.6.2, 20.8.3, 20.8.4, 20.9.2, and 2025 releases.
+
+The complete UI catalog is maintained in `flpswap/fl_versions.py`. Marketing-year labels and explicit build labels are mapped to dotted version/build values where specified. These are selectable labels; their presence does not mean FLP-SWAP can recreate or validate every historical FL Studio binary or guarantee cross-version compatibility.
 
 ## What the current engine does
 
