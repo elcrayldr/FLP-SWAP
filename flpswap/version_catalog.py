@@ -1,6 +1,6 @@
 """Known FL Studio release/build references.
 
-These entries are reference data, not proof that an FLP file was created by
+These entries are reference data, not proof that every FLP was created by
 that exact build. Windows and macOS builds must never be conflated.
 """
 from dataclasses import dataclass
@@ -18,6 +18,7 @@ class Release:
 
 
 RELEASES = (
+    Release("20.8.3", "windows", "2304"),
     Release("21.0.3", "windows", "3517", "2023-04-12", source="https://forum.image-line.com/viewtopic.php?t=302819"),
     Release("21.0.3", "macos", "3036", "2023-04-12", source="https://forum.image-line.com/viewtopic.php?t=302819"),
     Release("21.2.2", "windows", "3914", source="https://www.neowin.net/software/fl-studio-2122-build-3914/"),
