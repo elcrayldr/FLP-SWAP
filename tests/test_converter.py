@@ -65,7 +65,7 @@ class ConverterGuardrailTests(unittest.TestCase):
             self.assertTrue(report["source_preserved"])
             self.assertEqual(report["detected_source_version"], "20.8.3.2304")
             self.assertEqual(report["target_version"], "26.1.7.5654")
-            self.assertTrue(report["build_event_updated"])
+            self.assertTrue(report["migration"]["build_event_updated"])
             self.assertIn(untouched, result)
             self.assertEqual(report["input_event_count"], report["output_event_count"])
             self.assertFalse(report["compatibility_verified"])
