@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from flpswap import __version__
 from flpswap.flp_inspector import inspect_flp
+from flpswap.compatibility import assess_compatibility
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.version_detector import detect_installations
 
@@ -46,7 +47,10 @@ class FLPSwapApp(tk.Tk):
         actions.pack(fill="x", pady=(0, 10))
         ttk.Button(actions, text="Seleccionar proyecto FLP", command=self.choose_file).pack(side="left")
         ttk.Button(actions, text="Detectar FL Studio instalado", command=self.show_installations).pack(side="left", padx=8)
-        ttk.Button(actions, text="Exportar informe", command=self.export_report).pack(side="left")
+        ttk.Label(actions, text="Versión destino:").pack(side="left", padx=(12, 4))
+        self.target_version = tk.StringVar(value="21.3.6")
+        ttk.Entry(actions, textvariable=self.target_version, width=12).pack(side="left")
+        ttk.Button(actions, text="Exportar informe", command=self.export_report).pack(side="left", padx=8)
 
         self.file_label = ttk.Label(outer, text="Ningún proyecto seleccionado")
         self.file_label.pack(anchor="w", pady=8)
@@ -60,7 +64,8 @@ class FLPSwapApp(tk.Tk):
         self.output.insert("1.0", (
             "Estado: inspección de solo lectura\n\n"
             "Selecciona un FLP para consultar su estructura y la versión guardada si puede "
-            "identificarse en el archivo. No se altera ni se convierte el proyecto original.\n"
+            "identificarse en el archivo. Introduce una versión de destino para evaluar la diferencia. "
+            "La evaluación no convierte el proyecto ni garantiza que abra.\n"
         ))
         self.output.configure(state="disabled")
         self.last_report: dict = {"application_version": __version__, "status": "idle"}
@@ -98,6 +103,13 @@ class FLPSwapApp(tk.Tk):
             return
 
         self.file_label.configure(text=str(self.selected_file))
+        try:
+            assessment = assess_compatibility(metadata.saved_version, self.target_version.get().strip())
+            assessment_report = assessment.to_dict()
+        except ValueError as exc:
+            messagebox.showerror("Versión destino no válida", str(exc))
+            return
+
         self.last_report = {
             "application_version": __version__,
             "inspection": {
@@ -110,6 +122,7 @@ class FLPSwapApp(tk.Tk):
                 "notes": list(inspected.notes),
             },
             "flp_metadata": metadata_report,
+            "compatibility_assessment": assessment_report,
             "conversion": {
                 "performed": False,
                 "status": "not_implemented",
