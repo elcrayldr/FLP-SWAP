@@ -1,35 +1,36 @@
 # FLP-SWAP
 
-Aplicación Windows para inspeccionar proyectos FL Studio (.flp) y generar una copia cambiando sus metadatos de versión.
+Herramienta Windows para inspeccionar y migrar proyectos FL Studio (.flp) entre versiones.
 
-## Qué hace ahora el motor
+## Motor de migración implementado
 
-- Lee y valida la cabecera y el bloque de eventos del FLP.
-- Localiza el evento `FLVersion` y lo cambia por la versión de destino seleccionada.
-- Si la versión de destino incluye un número de build y el proyecto tiene el evento `FLBuild`, actualiza ese campo también.
-- Preserva byte a byte todos los demás eventos, incluidos datos opacos y estados de plugins que el programa no entiende.
-- Valida el resultado y nunca sobrescribe el archivo original.
+El conversor ahora procesa el flujo de eventos del FLP y aplica reglas explícitas en vez de limitarse a cambiar el número de versión:
 
-Esto es más seguro que parsear y volver a serializar todo el proyecto con una biblioteca de terceros que podría descartar eventos desconocidos.
+- Reconoce la excepción de FL Studio 25.2+: el evento `0xAC` tiene un payload de 3 bytes, no de 4.
+- Al convertir proyectos FL 25.2+ a destinos anteriores a 25.2, elimina el marcador `0xAC` y el banner de versión UTF-16LE `0xC0` que esos destinos no reconocen.
+- Adapta el tamaño de los registros de clips de playlist `0xE9`: 80 bytes en FL25, 60 en FL21–24 y 32 antes de FL21. La migración actual conserva el prefijo conocido de cada registro.
+- Actualiza el evento `FLVersion` y el número de build cuando el destino especifica un build.
+- Si el destino no especifica build, elimina el build de origen para no dejar metadatos contradictorios.
+- Valida el contenedor resultante y conserva intacto el archivo original.
 
-## Límite importante
+Estas reglas se basan en documentación pública de análisis del formato FLP y en diferencias observadas entre guardados de FL Studio. Referencias técnicas: [flpdiff FLP format spec](https://github.com/dawhubapp/flpdiff/blob/main/docs/fl-format/flp-format-spec.md), [FL25 event findings](https://github.com/dawhubapp/flpdiff/blob/main/docs/fl-format/fl25-event-format.md), [PyFLP event model](https://pyflp.readthedocs.io/en/stable/architecture/flp-format.html).
 
-**Cambiar los metadatos de versión no equivale a traducir todas las funciones del proyecto.** Si el FLP usa instrumentos, efectos, automatizaciones, formatos de plugin o eventos que la versión de destino no admite, estos datos se conservan, pero la versión antigua todavía podría ignorarlos o rechazar el proyecto. El programa no convierte automáticamente plugins VST/VST3 ni recrea parámetros incompatibles.
+## Límite de compatibilidad
 
-Por tanto, FLP-SWAP ya ejecuta una modificación real y conservadora del archivo, pero todavía no es un conversor semántico universal de FL Studio 1–26. No debe anunciarse como compatible hasta probar el resultado en la versión destino.
+El motor tiene migraciones reales para las diferencias estructurales anteriores, pero no puede reconstruir genéricamente el estado privado de cualquier plugin ni adivinar semántica de todos los eventos desconocidos. En particular, una conversión entre versiones mayores puede conservar parámetros que la versión de destino no entiende. Por eso el informe distingue entre **archivo convertido** y **compatibilidad verificada**. La prueba final requiere abrir y reproducir el proyecto en la versión destino.
 
-## Flujo de uso
+## Uso
 
 1. Selecciona un archivo `.flp`.
-2. Selecciona la versión de destino.
-3. Pulsa **Convertir copia** y elige un nombre nuevo.
-4. Abre la copia en la versión destino y comprueba patrones, notas, playlist, automatizaciones, mezclador, plugins, muestras y reproducción.
+2. Selecciona la versión destino.
+3. Pulsa **Convertir copia** y guarda el resultado con otro nombre.
+4. Abre la copia en la versión destino y revisa playlist, notas, automatizaciones, mezclador, plugins, muestras y reproducción.
 
-Conserva siempre el archivo original.
+No sobrescribe el archivo original.
 
 ## Versiones seleccionables
 
-El catálogo de interfaz incluye las 110 etiquetas de versiones aportadas para este proyecto, desde FruityLoops 1.0.0 hasta FL Studio 2026.1.7. La disponibilidad de una etiqueta en la lista no implica que todas las características de esa versión se puedan migrar.
+El catálogo de interfaz incluye las 110 etiquetas de versiones solicitadas, desde FruityLoops 1.0.0 hasta FL Studio 2026.1.7. La lista de etiquetas no significa que existan reglas de migración específicas y verificadas para cada pareja posible de versiones.
 
 ## Construcción en Windows
 
@@ -49,12 +50,8 @@ Para compilar:
 build_windows.bat
 ```
 
-La aplicación portable queda en `dist\FLPSwap\FLPSwap.exe`. GitHub Actions genera los artefactos de Windows en la pestaña [Actions](https://github.com/elcrayldr/FLP-SWAP/actions).
+GitHub Actions genera los artefactos de Windows en [Actions](https://github.com/elcrayldr/FLP-SWAP/actions).
 
-## Dependencias y licencia
+## Próximas reglas
 
-El repositorio conserva PyFLP como dependencia de diagnóstico/desarrollo, aunque el motor de modificación de versión actual trabaja directamente con los bytes del FLP. PyFLP es un proyecto independiente, no oficial y distribuido bajo GPL-3.0-or-later: https://github.com/demberto/PyFLP.
-
-## Próxima fase necesaria para conversión funcional
-
-La siguiente fase es un sistema de reglas por versiones: identificar eventos y características añadidos/cambiados entre releases, aplicar migraciones verificables para reglas conocidas y emitir un informe de las funciones que no se pueden traducir. La compatibilidad real debe probarse abriendo los archivos con las versiones de FL Studio correspondientes; cambiar el campo de versión no sustituye esa prueba.
+El siguiente trabajo es ampliar el catálogo de migraciones con fixtures públicos de proyectos de versiones anteriores y pruebas de apertura en la aplicación original. Las reglas se añadirán por diferencia de versión/evento observada; no se deben eliminar datos desconocidos solo por su número de evento.
