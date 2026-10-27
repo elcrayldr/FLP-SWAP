@@ -174,7 +174,7 @@ class FLPSwapApp(tk.Tk):
             "conversion": {
                 "performed": False,
                 "status": "awaiting_user_conversion",
-                "message": "El análisis no modifica el proyecto; «Convertir copia» cambia solo los metadatos de versión y conserva los demás eventos.",
+                "message": "El motor aplica reglas conocidas de migración FLP, incluidas las diferencias de estructura de FL25.2+ y los registros de clips de playlist.",
             },
         }
         source_display = metadata.saved_version or "No identificada"
@@ -238,7 +238,7 @@ class FLPSwapApp(tk.Tk):
             return
         self.last_report = {"application_version": __version__, "conversion": report}
         self._write(
-            "SE HA GENERADO UNA COPIA CON METADATOS DE VERSIÓN MODIFICADOS\n\n"
+            "SE HA GENERADO UNA COPIA CON REGLAS DE MIGRACIÓN APLICADAS\n\n"
             f"Origen: {report['source_path']}\n"
             f"Versión detectada: {report['detected_source_version']}\n"
             f"Versión seleccionada como origen: {report['declared_source_version'] or 'Auto-detectada'}\n"
@@ -247,13 +247,13 @@ class FLPSwapApp(tk.Tk):
             f"Eventos: {report['input_event_count']} → {report['output_event_count']}\n"
             f"Tamaño: {report['input_size_bytes']:,} → {report['output_size_bytes']:,} bytes\n"
             f"Original intacto: {'Sí' if report['source_preserved'] else 'NO'}\n\n"
-            "IMPORTANTE: METADATOS ACTUALIZADOS; NO ES UNA TRADUCCIÓN COMPLETA DE FUNCIONES.\n"
+            "REGLAS DE MIGRACIÓN APLICADAS:\n"
             "No es una garantía de compatibilidad total ni de conservación exacta del sonido.\n\n"
             "AVISOS:\n- " + "\n- ".join(report["warnings"])
         )
         messagebox.showwarning(
             "Copia generada; falta validación en FL Studio",
-            "Se ha guardado una copia cambiando la versión declarada. Los demás eventos se preservan, pero eso no convierte automáticamente funciones nuevas para versiones antiguas. Comprueba el archivo en la versión de destino.",
+            "Se ha generado una copia con reglas conocidas de migración. Ábrela en la versión destino y comprueba playlist, automatizaciones, plugins y reproducción.",
         )
 
     def on_target_changed(self, _event=None) -> None:
