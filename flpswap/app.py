@@ -11,34 +11,26 @@ from flpswap.converter import ConversionError, convert_flp
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
 from flpswap.flp_diagnostics import inventory_flp
 from flpswap.version_detector import detect_installations
+from flpswap.fl_versions import VERSION_LABELS, INTERNAL_VERSION_OVERRIDES
 
 
-TARGET_VERSIONS = (
-    "FL Studio 11.0.0", "FL Studio 11.1.0", "FL Studio 11.1.3",
-    "FL Studio 12.0.0", "FL Studio 12.1.0", "FL Studio 12.2.0",
-    "FL Studio 12.3.0", "FL Studio 12.4.0", "FL Studio 12.5.0",
-    "FL Studio 12.5.1", "FL Studio 20.0.0", "FL Studio 20.1.0",
-    "FL Studio 20.5.0", "FL Studio 20.6.0", "FL Studio 20.7.0",
-    "FL Studio 20.8.0", "FL Studio 20.9.0", "FL Studio 20.9.2",
-    "FL Studio 21.0.0", "FL Studio 21.1.0", "FL Studio 21.2.0",
-    "FL Studio 21.2.3", "FL Studio 24.1.0", "FL Studio 24.1.2",
-    "FL Studio 2025.1.0", "FL Studio 2025.2.5", "FL Studio 26.1.1",
-    "FL Studio 26.1.4", "FL Studio 26.1.7",
-)
-
-# User-facing 2025 release labels map to internal FL Studio versions stored in FLP files.
-TARGET_INTERNAL_VERSIONS = {
-    # Display names are simplified; FLP files store the actual saved build when known.
-    "FL Studio 2025.1.0": "25.1.1.4879",
-    "FL Studio 2025.2.5": "25.2.5.5319",
-    "FL Studio 21.2.3": "21.2.3.4004",
-    "FL Studio 26.1.4": "26.1.4.5589",
-    "FL Studio 26.1.7": "26.1.7.5654",
-}
+TARGET_VERSIONS = VERSION_LABELS
 
 
 def internal_version(label: str) -> str:
-    return TARGET_INTERNAL_VERSIONS.get(label, label.replace("FL Studio ", "").strip())
+    """Translate UI labels into a dotted version/build value for FLP metadata."""
+    if label in INTERNAL_VERSION_OVERRIDES:
+        return INTERNAL_VERSION_OVERRIDES[label]
+    value = label
+    for prefix in ("FL Studio ", "FruityLoops "):
+        if value.startswith(prefix):
+            value = value[len(prefix):].strip()
+            break
+    # Several legacy releases are conventionally written as major.minor only.
+    # Pad only two-part numeric labels; do not infer a build number.
+    if value.count(".") == 1 and all(part.isdigit() for part in value.split(".")):
+        value += ".0"
+    return value
 
 
 class FLPSwapApp(tk.Tk):
@@ -88,7 +80,7 @@ class FLPSwapApp(tk.Tk):
         )
         self.source_combo.pack(side="left", padx=(6, 14))
         ttk.Label(version_row, text="Versión de destino:").pack(side="left")
-        self.target_version = tk.StringVar(value="FL Studio 26.1.7")
+        self.target_version = tk.StringVar(value="FL Studio 2026.1.7")
         self.target_combo = ttk.Combobox(
             version_row, textvariable=self.target_version, values=TARGET_VERSIONS,
             state="readonly", width=22,
@@ -113,7 +105,7 @@ class FLPSwapApp(tk.Tk):
         self.output.pack(fill="both", expand=True)
         self.output.insert("1.0", (
             "PASO 1 — Selecciona tu archivo .flp. La aplicación leerá la versión guardada dentro del proyecto, si está disponible.\n\n"
-            "PASO 2 — Selecciona la versión de destino en la lista desplegable (por defecto, FL Studio 26.1.7).\n\n"
+            "PASO 2 — Selecciona la versión de destino en la lista desplegable (por defecto, FL Studio 2026.1.7).\n\n"
             "PASO 3 — Pulsa «Convertir copia». Se intentará una reescritura estructurada y se guardará otro archivo.\n"
             "La compatibilidad funcional no está garantizada; conserva el original y prueba el resultado en FL Studio.\n"
         ))
