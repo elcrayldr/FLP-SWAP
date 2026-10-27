@@ -123,6 +123,9 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
                 source_major = None
             break
     source_has_fl25_format = source_has_fl25_format or (source_major is not None and source_major >= 25)
+    if source_major is None and source_has_fl25_format:
+        source_major = 25
+    source_playlist_size = 80 if source_major is not None and source_major >= 25 else (60 if source_major is not None and source_major >= 21 else 32)
     parts = [int(part) for part in target_version.split(".")]
     target_major = parts[0]
     target_minor = parts[1] if len(parts) > 1 else 0
@@ -175,11 +178,11 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
             removed_25_events.append("0xC0-banner")
             continue
 
-        if event_id == 0xE9 and source_has_fl25_format and target_playlist_size < 80:
-            old_record_size = 80
+        if event_id == 0xE9 and source_playlist_size > target_playlist_size:
+            old_record_size = source_playlist_size
             if len(payload) % old_record_size != 0:
                 raise MigrationError(
-                    f"El evento de playlist 0xE9 contiene {len(payload)} bytes; no es múltiplo de 80, "
+                    f"El evento de playlist 0xE9 contiene {len(payload)} bytes; no es múltiplo de {old_record_size}, "
                     "por lo que no se puede migrar con seguridad."
                 )
             transformed = bytearray()
@@ -207,6 +210,7 @@ def migrate_event_stream(raw: bytes, target_version: str) -> tuple[bytes, dict]:
     rebuilt.extend(output)
     report = {
         "source_fl25_format_detected": source_has_fl25_format,
+        "source_playlist_record_size": source_playlist_size,
         "target_playlist_record_size": target_playlist_size,
         "removed_known_fl25_events": removed_25_events,
         "playlist_records_resized": resized_playlist_records,
