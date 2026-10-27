@@ -9,6 +9,7 @@ from flpswap.flp_inspector import inspect_flp
 from flpswap.compatibility import assess_compatibility
 from flpswap.converter import ConversionError, convert_flp
 from flpswap.flp_parser import FlpFormatError, parse_flp_metadata
+from flpswap.flp_diagnostics import inventory_flp
 from flpswap.version_detector import detect_installations
 
 
@@ -136,6 +137,7 @@ class FLPSwapApp(tk.Tk):
         try:
             inspected = inspect_flp(self.selected_file)
             metadata = parse_flp_metadata(self.selected_file)
+            event_inventory = inventory_flp(self.selected_file)
             metadata_report = {
                 "valid_container": metadata.valid_container,
                 "header_length": metadata.header_length,
@@ -146,6 +148,7 @@ class FLPSwapApp(tk.Tk):
                 "event_count": metadata.event_count,
                 "saved_version": metadata.saved_version,
                 "warnings": list(metadata.warnings),
+                "event_inventory": event_inventory.to_dict(),
             }
         except (OSError, ValueError, FlpFormatError) as exc:
             messagebox.showerror("No se pudo inspeccionar", str(exc))
@@ -174,6 +177,7 @@ class FLPSwapApp(tk.Tk):
                 "notes": list(inspected.notes),
             },
             "flp_metadata": metadata_report,
+            "event_inventory": event_inventory.to_dict(),
             "compatibility_assessment": assessment_report,
             "conversion": {
                 "performed": False,
@@ -195,6 +199,8 @@ class FLPSwapApp(tk.Tk):
             f"RESULTADO: {relation_text}\n\n"
             f"Tamaño: {inspected.size_bytes:,} bytes\n"
             f"Eventos FLP analizados: {metadata.event_count}\n"
+            f"Tipos de evento distintos: {len(event_inventory.event_id_counts)}\n"
+            f"IDs de evento que requieren revisar reglas: {', '.join(map(str, event_inventory.event_ids_needing_mapping_review)) or 'Ninguno detectado'}\n"
             f"Contenedor FLP válido: {'Sí' if metadata.valid_container else 'No'}\n\n"
             "ESTADO DE CONVERSIÓN: NO REALIZADA.\n"
             "Esta versión de prueba no modifica el proyecto.\n\n"
